@@ -53,7 +53,20 @@ In only a few words, the aim is to make a VST/Clap plugin that allows you to liv
 
 ## Have I reached the goal?
 
-no.
+Not fully, but the wishlist has a real first pass now:
+
+- Syntax modes: Glicol, Strudel-ish, FoxDot-ish, and Rhai/FoxDot-like modes are selectable in the editor.
+- Syntax feedback: compile/runtime translation errors are shown in the editor instead of failing silently.
+- Reference panes: the editor includes searchable reference entries, example insertion, and a timbre browser.
+- Soft prediction: the editor suggests small next-step snippets based on the current syntax mode and cursor context.
+- User samples: WAV files can be registered by ID/path, persisted as sample references, and inserted as Glicol sampler snippets.
+- Built-in sounds: modeled timbres include basses, drums, hats, noise colors, plucks, pads, organ, sub, clave, and laser-style patches.
+
+Still not the finish line:
+
+- The Strudel/FoxDot support is intentionally partial translation, not full compatibility with those languages.
+- Custom samples currently require typing a WAV path rather than using a full file-picker/library workflow.
+- Host-synced pattern timing is still early and needs deeper DAW validation.
 
 # License
 
@@ -69,7 +82,7 @@ Third-party license notices are provided in [`THIRD_PARTY_NOTICES.md`](./THIRD_P
 
 Unless otherwise noted, the original code in this repository is:
 
-Copyright (C) 2026 [Your Name]
+Copyright (C) 2026 pseudosecret / Lorselq
 
 Licensed under the GNU General Public License v3.0 or later.
 
@@ -106,7 +119,7 @@ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
 FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.[Paste the full MIT license text from Glicol here.]
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## NIH-plug
 
