@@ -1,6 +1,6 @@
 # Glykon's Hair
 
-"What a handsome head of hair this VST/Clap has!"
+What a handsome head of hair this VST/Clap has.
 
 ## Preamble
 
