@@ -1,5 +1,7 @@
 # Glykon's Hair
 
+"What a handsome head of hair this VST/Clap has!"
+
 ## Preamble
 
 Everything but the licensing is trés casually written because this is a trés casual project. I love all the things it touches and I endeavor to do my best to make it super rad, but all that follows is going to read pretty relaxed because these words are like the packaging it would come in, were it a box you decided to grab at a music shop because you didn't know what else to get.
