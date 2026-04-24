@@ -1,0 +1,27 @@
+[package]
+name = "glykons_hair"
+version = "0.1.0"
+edition = "first??"
+license = "GPL-3.0-or-later"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[[bin]]
+name = "glykons_hair_standalone"
+path = "src/main.rs"
+
+[dependencies]
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", features = ["standalone"] }
+nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug.git" }
+crossbeam = "0.8"
+rtrb = "0.3"
+parking_lot = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+glicol = "0.13"
+rhai = { version = "1.16", features = ["sync"] }
+
+[workspace]
+members = ["xtask"]
