@@ -1,5 +1,5 @@
 use crate::timbres::get_timbre_patch;
-use crate::translator::note_token_to_glicol_freq;
+use crate::translator::{note_token_to_glicol_midi, GLICOL_MIDDLE_C_HZ};
 use rhai::{Dynamic, Engine};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -29,8 +29,8 @@ impl StrudelPattern {
 
 static PATTERN_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-fn strudel_note_to_freq(note: &str) -> String {
-    note_token_to_glicol_freq(note)
+fn strudel_note_to_midi(note: &str) -> String {
+    note_token_to_glicol_midi(note)
 }
 
 // Very basic Mini-Notation flattener for prototype
@@ -43,7 +43,7 @@ fn parse_mini_notation(input: &str) -> Vec<String> {
             let parts: Vec<&str> = token.split('*').collect();
             if parts.len() == 2 {
                 if let Ok(count) = parts[1].parse::<usize>() {
-                    let midi = strudel_note_to_freq(parts[0]);
+                    let midi = strudel_note_to_midi(parts[0]);
                     for _ in 0..count {
                         tokens.push(midi.clone());
                     }
@@ -51,7 +51,7 @@ fn parse_mini_notation(input: &str) -> Vec<String> {
                 }
             }
         }
-        tokens.push(strudel_note_to_freq(token));
+        tokens.push(strudel_note_to_midi(token));
     }
     tokens
 }
@@ -150,7 +150,10 @@ pub fn evaluate_rhai(script: &str) -> Result<String, String> {
                 "~{}_trig: speed {} >> seq {}\n",
                 prefix, p.speed, seq_str
             ));
-            out.push_str(&format!("~{}_pitch: ~{}_trig >> mtof\n", prefix, prefix));
+            out.push_str(&format!(
+                "~{}_pitch: ~{}_trig >> mul {}\n",
+                prefix, prefix, GLICOL_MIDDLE_C_HZ
+            ));
             out.push_str(patch.trim());
             out.push('\n');
             out.push_str(&format!(
@@ -204,7 +207,10 @@ pub fn evaluate_rhai(script: &str) -> Result<String, String> {
                     "~{}_trig: speed {} >> seq {}\n",
                     prefix, p.speed, seq_str
                 ));
-                out.push_str(&format!("~{}_pitch: ~{}_trig >> mul 1.0\n", prefix, prefix));
+                out.push_str(&format!(
+                    "~{}_pitch: ~{}_trig >> mul {}\n",
+                    prefix, prefix, GLICOL_MIDDLE_C_HZ
+                ));
                 out.push_str(patch.trim());
                 out.push('\n');
                 out.push_str(&format!(

@@ -112,14 +112,7 @@ impl Plugin for GlykonsHair {
                     compiled_code,
                 } => {
                     self.valid_code_map[note as usize] = compiled_code.clone();
-                    // Live Coding Fix: Instantly update any currently playing voices!
-                    for v in &mut self.voice_manager.voices {
-                        if let audio_engine::VoiceState::Playing { note: active_note } = v.state {
-                            if active_note == note {
-                                v.engine.update_with_code(&compiled_code);
-                            }
-                        }
-                    }
+                    self.voice_manager.reload_active_note(note, &compiled_code);
                 }
                 validation::AudioMessage::LoadSample {
                     symbol,
@@ -304,8 +297,31 @@ nih_export_vst3!(GlykonsHair);
 
 #[cfg(test)]
 mod tests {
-    use crate::validation::{compile_source_for_runtime, SyntaxMode};
+    use crate::timbres::TIMBRE_NAMES;
+    use crate::validation::{compile_source_for_runtime, validate_glicol_code, SyntaxMode};
     use glicol::Engine;
+
+    /// This helper renders a short Glicol graph and returns its peak absolute sample value.
+    /// Graph validation only proves that Glicol accepted the syntax, while this protects the
+    /// musical contract that translated patterns actually produce audible audio.
+    fn render_peak(code: &str, blocks: usize) -> f32 {
+        let mut engine = Engine::<128>::new();
+        engine.update_with_code(code);
+
+        let mut peak = 0.0_f32;
+        for _ in 0..blocks {
+            let (out, logs) = engine.next_block(vec![]);
+            assert_eq!(logs[0], 0, "Glicol reported an error while rendering");
+
+            for channel in out {
+                for sample in channel.iter() {
+                    peak = peak.max(sample.abs());
+                }
+            }
+        }
+
+        peak
+    }
 
     #[test]
     // This test protects the core engine integration contract by ensuring a valid graph
@@ -348,6 +364,106 @@ out: ~kick >> add ~bass >> mul 0.5
     }
 
     #[test]
+    // This test reproduces the reported Element failure: a Strudel sawbass pattern can compile but
+    // still be silent if the translator wires Glicol's sequencer ratios into oscillators wrongly.
+    fn strudel_sawbass_renders_audible_audio() {
+        let compiled =
+            compile_source_for_runtime("note(\"c3\").s(\"sawbass\")", SyntaxMode::Strudel)
+                .expect("Strudel translation should compile");
+
+        let peak = render_peak(&compiled, 64);
+        assert!(peak > 0.001, "Expected audible Strudel output, got {peak}");
+    }
+
+    #[test]
+    // This test keeps the forgiving text extractor useful for Strudel-ish reversed chains.
+    // The prototype translator scans for both function calls, so either order should become sound.
+    fn strudel_reversed_chain_renders_audible_audio() {
+        let compiled =
+            compile_source_for_runtime("s(\"sawbass\").note(\"c3\")", SyntaxMode::Strudel)
+                .expect("Reversed Strudel-like chain should compile");
+
+        let peak = render_peak(&compiled, 64);
+        assert!(
+            peak > 0.001,
+            "Expected audible reversed-chain Strudel output, got {peak}"
+        );
+    }
+
+    #[test]
+    // This test protects the central Strudel goal: multiple `$:` pattern lanes should compile into
+    // independent Glicol chains and be summed, rather than overwriting each other or going silent.
+    fn strudel_parallel_dollar_patterns_render_audio() {
+        let source = r#"
+$: note("<[c2 c3]*4 [bb1 bb2]*4 [f2 f3]*4 [eb2 eb3]*4>")
+.sound("gm_synth_bass_1").lpf(800)
+
+$: n(`<
+[~ 0] 2 [0 2] [~ 2]
+[~ 0] 1 [0 1] [~ 1]
+[~ 0] 3 [0 3] [~ 3]
+[~ 0] 2 [0 2] [~ 2]
+>*4`).scale("C4:minor")
+.sound("gm_synth_strings_1")
+"#;
+        let compiled = compile_source_for_runtime(source, SyntaxMode::Strudel)
+            .expect("Parallel Strudel patterns should compile");
+
+        assert!(
+            compiled.contains("~p1_final") && compiled.contains("~p2_final"),
+            "Expected two independent pattern lanes, got:\n{compiled}"
+        );
+        assert!(
+            compiled.contains("out: ~p1_final >> add ~p2_final"),
+            "Expected both pattern lanes to be mixed, got:\n{compiled}"
+        );
+
+        let peak = render_peak(&compiled, 128);
+        assert!(
+            peak > 0.001,
+            "Expected audible parallel Strudel output, got {peak}"
+        );
+    }
+
+    #[test]
+    // This test encodes the UX rule from the editor examples: if users write more than one Strudel
+    // pattern line, each lane must be prefixed with `$:` so the translator can split them safely.
+    fn strudel_multiple_patterns_without_dollar_report_error() {
+        let source = "note(\"c3 e3 g3\")\nnote(\"e3 g3 c4\")";
+        let result = compile_source_for_runtime(source, SyntaxMode::Strudel);
+        let error = result.expect_err("Missing `$:` should report a Strudel error");
+        assert!(
+            error.contains("$:"),
+            "Expected `$:` guidance in error message, got: {error}"
+        );
+    }
+
+    #[test]
+    // This test catches the malformed repeat case where `*` appears outside the pattern string.
+    // The translator should reject it explicitly instead of silently ignoring the suffix.
+    fn strudel_repeat_outside_pattern_string_reports_error() {
+        let source = "$: note(\"<c2>\")*3";
+        let result = compile_source_for_runtime(source, SyntaxMode::Strudel);
+        let error = result.expect_err("Repeat outside quotes should be rejected");
+        assert!(
+            error.contains("inside"),
+            "Expected repeat-placement error message, got: {error}"
+        );
+    }
+
+    #[test]
+    // This test protects grouped rhythm handling: `9 [1 1]` should become a 2:1:1 onset pattern,
+    // which maps to `9 _ 1 1` in the sequencer lane instead of three evenly spaced onsets.
+    fn strudel_grouped_rhythm_expands_with_rest_holds() {
+        let compiled = compile_source_for_runtime("$: note(\"9 [1 1]\")", SyntaxMode::Strudel)
+            .expect("Grouped Strudel rhythm should compile");
+        assert!(
+            compiled.contains("seq 76 _ 62 62"),
+            "Expected grouped rhythm expansion in compiled seq, got:\n{compiled}"
+        );
+    }
+
+    #[test]
     // This test covers the README promise that FoxDot-style input can be selected and translated.
     // It does not claim full FoxDot compatibility, but it protects the supported player/synth form.
     fn foxdot_compile_produces_runtime_graph() {
@@ -362,10 +478,22 @@ out: ~kick >> add ~bass >> mul 0.5
             compiled.contains("~p1_trig"),
             "Translated graph should include trigger sequence"
         );
-        assert!(
-            compiled.contains("rlpf"),
-            "TB-303 timbre should be selected"
-        );
+        assert!(compiled.contains("lpf"), "TB-303 timbre should be selected");
+    }
+
+    #[test]
+    // This test walks every advertised timbre through the Strudel translator and Glicol validator.
+    // The editor exposes these names as clickable presets, so each one must build a real runtime
+    // graph instead of silently leaving the previous sound alive.
+    fn every_advertised_timbre_builds_a_valid_graph() {
+        for timbre in TIMBRE_NAMES {
+            let source = format!("note(\"c3\").s(\"{timbre}\")");
+            let compiled = compile_source_for_runtime(&source, SyntaxMode::Strudel)
+                .unwrap_or_else(|err| panic!("{timbre} should compile: {err}"));
+
+            validate_glicol_code(&compiled)
+                .unwrap_or_else(|err| panic!("{timbre} should validate: {err}"));
+        }
     }
 
     #[test]

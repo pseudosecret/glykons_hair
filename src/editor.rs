@@ -82,13 +82,13 @@ const GLICOL_DOCS: &[DocItem] = &[
 const STRUDEL_DOCS: &[DocItem] = &[
     DocItem {
         symbol: "note",
-        desc: "Play a sequence of notes using mini-notation.",
-        example: "// Play C Major chord sequence\nnote(\"c3 e3 g3\")",
+        desc: "Play a sequence using mini-notation. Prefix lanes with `$:`.",
+        example: "// Play C Major chord sequence\n$: note(\"c3 e3 g3\")",
     },
     DocItem {
         symbol: "s",
         desc: "Set the synthesizer or sample.",
-        example: "// Use the sawbass synth\nnote(\"c3\").s(\"sawbass\")",
+        example: "// Use the sawbass synth\n$: note(\"c3\").s(\"sawbass\")",
     },
 ];
 
@@ -497,7 +497,8 @@ pub fn create(params: Arc<GlykonsHairParams>, tx: Sender<AudioMessage>) -> Optio
                                         if ui.button("Use").clicked() {
                                             let snippet = match state.syntax_mode {
                                                 SyntaxMode::Glicol => format!(
-                                                    "~p1_trig: speed 4.0 >> seq 220 _ 330 _\n~p1_pitch: ~p1_trig >> mul 1.0\n{}\nout: ~p1_out >> mul 0.5",
+                                                    "~p1_trig: speed 4.0 >> seq 60 _ 64 _\n~p1_pitch: ~p1_trig >> mul {}\n{}\nout: ~p1_out >> mul 0.5",
+                                                    crate::translator::GLICOL_MIDDLE_C_HZ,
                                                     crate::timbres::get_timbre_patch(timbre, "p1").trim()
                                                 ),
                                                 SyntaxMode::FoxDot => {
